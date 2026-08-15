@@ -1,27 +1,55 @@
 # lerd Glance
 
-Your [lerd](https://lerd.sh) dashboard at a glance in the Omarchy Quattro bar, so you can see the state of your local PHP environment without opening a browser tab.
+> Your [lerd](https://lerd.sh) environment at a glance in the Omarchy Quattro
+> bar. Sites, services, workers and resources without opening the dashboard.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Omarchy](https://img.shields.io/badge/Omarchy-Quattro-5865F2)](https://omarchy.org)
+[![lerd](https://img.shields.io/badge/lerd-lerd.sh-ff2d20)](https://lerd.sh)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2Flerd-ff2d20?logo=reddit)](https://reddit.com/r/lerd)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/5JK54s7xCC)
 
 ![The lerd Glance panel open in the Omarchy bar](preview.png)
 
-## What it shows
+lerd Glance puts the state of your local PHP environment in the bar you are
+already looking at. A healthy environment stays quiet, a broken one is obvious
+from across the screen, and the whole thing talks to nothing but the lerd
+already running on your machine.
 
-The bar carries lerd's mark on its own. When something needs attention it gains a coloured dot, yellow for a warning and red when nginx is down, so a healthy environment stays quiet and a broken one is obvious from across the screen. Hovering gives you the counts and the list of problems without opening anything.
+## Features
 
-Clicking opens the panel:
+### In the bar
 
-- **Resources** — total CPU and memory across every lerd container, as meters, with the share of host memory and the container count.
-- **Sites and services** — how many of each are running, paused sites left out of the count.
-- **Workers** — a counter per worker type, queue, horizon, schedule, reverb, Stripe and framework workers such as Vite, each with its own glyph.
-- **Environment** — nginx, `.test` resolution and the file watcher, plus every installed PHP version with the default in bold.
-- **Services** — one row each with its status, version and port.
-- **Needs attention** — what is actually wrong, in plain words: a failed service, a worker that died, DNS that stopped resolving. It only appears when there is something to say.
+- 🔴 **Quiet until it matters.** The bar carries lerd's mark on its own and gains a coloured dot only when something is wrong, yellow for a warning and red when nginx is down.
 
-Two actions sit at the bottom. **Open dashboard** opens `http://lerd.localhost`. **Clean up** appears only when lerd reports reclaimable disk space, shows how much, and hands the work to lerd's own cleanup rather than calling podman itself.
+- 🖱️ **Hover for the short version.** Site and service counts, CPU, memory, and the list of problems, without opening anything.
+
+- 🌗 **Monochrome and theme-aware.** The mark takes the bar's foreground, so it looks right in every Omarchy theme.
+
+### In the panel
+
+- 📊 **Resources.** Total CPU and memory across every lerd container, drawn as the same meters the dashboard uses, with the share of host memory and the container count.
+
+- 🌐 **Sites and services.** How many of each are running, with paused sites left out of the count instead of quietly failing it.
+
+- ⚙️ **Workers by type.** A counter and a glyph per kind: queue, horizon, schedule, reverb, Stripe, and framework workers such as Vite.
+
+- 🩺 **Environment health.** nginx, `.test` resolution and the file watcher, plus every installed PHP version with the default in bold.
+
+- 🗄️ **Services at a glance.** One row each with status, version and port.
+
+- ⚠️ **Needs attention.** What is actually wrong, in plain words, and nothing at all when nothing is. A worker only counts as unhealthy when lerd itself says so, so a queue worker you never started is not reported as broken.
+
+### Actions
+
+- 🚀 **Open dashboard.** Hands off to `xdg-open http://lerd.localhost`.
+
+- 🧹 **Clean up.** Appears only when lerd reports reclaimable disk space, shows how much, and lets lerd apply its own freshly inspected plan rather than calling podman itself.
 
 ## Requirements
 
-Omarchy Quattro, and lerd running on the same machine. Nothing else, and no configuration.
+Omarchy Quattro, and lerd running on the same machine. Nothing else, and no
+configuration.
 
 ## Install
 
@@ -31,9 +59,9 @@ omarchy plugin add https://github.com/lerd-env/lerd-omarchy-glance.git --enable
 
 ## Usage
 
-Click the widget to open or close the panel, press Escape to close it. Clicking also forces a refresh; otherwise it polls every 30 seconds, and every 5 seconds while the panel is open.
-
-Paused sites are left out of the counts, and a worker is only ever called unhealthy when lerd itself says so, so a queue worker you simply never started is not reported as broken.
+Click the widget to open or close the panel, press Escape to close it. Clicking
+also forces a refresh; otherwise it polls every 30 seconds, and every 5 seconds
+while the panel is open.
 
 ## Configure
 
@@ -41,21 +69,30 @@ Paused sites are left out of the counts, and a worker is only ever called unheal
 omarchy bar move sh.lerd.glance --section right
 ```
 
-The plugin reads `http://127.0.0.1:7073`, the address lerd's dashboard already listens on, and the widget says so plainly when lerd is not running. If you serve lerd on another port, change the `endpoint` property at the top of `BarWidget.qml`.
+The plugin reads `http://127.0.0.1:7073`, the address lerd's dashboard already
+listens on, and says so plainly when lerd is not running. If you serve lerd on
+another port, change the `endpoint` property at the top of `BarWidget.qml`.
 
 ## Privacy and permissions
 
-Everything happens over loopback to the lerd instance already running as your user. The plugin sends no telemetry and contacts no third party. It changes nothing unless you press a button: the cleanup request, and the `xdg-open` that Open dashboard runs. That `xdg-open` is the only process it ever starts.
+Everything happens over loopback to the lerd instance already running as your
+user. The plugin sends no telemetry and contacts no third party. It changes
+nothing unless you press a button: the cleanup request, and the `xdg-open` that
+Open dashboard runs. That `xdg-open` is the only process it ever starts.
 
 ## Development
 
-All the logic that turns the dashboard API into what you see lives in `Model.js`, free of QML imports, so it runs under node:
+All the logic that turns lerd's API into what you see lives in `Model.js`, free
+of QML imports, so it runs under node while the shell loads the same file:
 
 ```sh
 node --test test/model.test.mjs
 ```
 
-`BarWidget.qml` owns the polling and hands a finished summary to `Panel.qml`; `Meter.qml`, `StatRow.qml`, `StatusDot.qml` and `Mark.qml` are the pieces both are drawn from, and `Theme.js` holds the state palette, which follows the lerd dashboard's own colours.
+`BarWidget.qml` owns the polling and hands a finished summary to `Panel.qml`.
+`Meter.qml`, `StatRow.qml`, `StatusDot.qml` and `Mark.qml` are the pieces both
+are drawn from, and `Theme.js` holds the state palette, which follows the lerd
+dashboard's own colours.
 
 Validate a change the way the shell does before opening a pull request:
 

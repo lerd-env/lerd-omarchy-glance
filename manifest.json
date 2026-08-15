@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "sh.lerd.glance",
+  "name": "lerd Glance",
+  "version": "0.1.0",
+  "author": "George Dumitrescu",
+  "license": "MIT",
+  "description": "Sites, services and workers from the lerd dashboard, at a glance in the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "lerd Glance",
+    "category": "Development",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

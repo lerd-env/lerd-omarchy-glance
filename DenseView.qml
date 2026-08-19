@@ -148,12 +148,14 @@ Item {
 
   // A table row: a zebra stripe, and it knows when the pointer is over it so
   // the row can trade its trailing detail for the actions it offers. The
-  // hover area takes no buttons, so it never swallows a click meant for an
-  // icon sitting on top of it.
+  // pointer is tracked with a HoverHandler, not a MouseArea: an action icon
+  // sitting on the row carries its own MouseArea, which would take the hover
+  // away from a MouseArea here and leave the row hiding the very icon the
+  // pointer just reached.
   component TableRow: Item {
     id: tableRow
     property int index: 0
-    readonly property bool hovered: hoverArea.containsMouse
+    readonly property bool hovered: hoverArea.hovered
     width: parent ? parent.width : 100
     height: root.rowH
     Rectangle { anchors.fill: parent; color: tableRow.index % 2 ? root.zebra : "transparent" }
@@ -162,12 +164,7 @@ Item {
       visible: tableRow.hovered
       color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
     }
-    MouseArea {
-      id: hoverArea
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-    }
+    HoverHandler { id: hoverArea }
   }
 
   // One-letter environment flag: filled when on, outlined when off.
@@ -362,7 +359,7 @@ Item {
               requests: Actions.siteActions(siteRow.modelData)
               panel: root.panel
               foreground: root.foreground
-              revealed: siteRow.hovered
+              revealed: siteRow.hovered || siteActions.hovered
             }
           }
         }
@@ -536,7 +533,7 @@ Item {
               requests: Actions.serviceActions(svcRow.modelData)
               panel: root.panel
               foreground: root.foreground
-              revealed: svcRow.hovered
+              revealed: svcRow.hovered || svcActions.hovered
             }
           }
         }
@@ -594,7 +591,7 @@ Item {
                   requests: Actions.workerActions(wRow.modelData)
                   panel: root.panel
                   foreground: root.foreground
-                  revealed: wRow.hovered
+                  revealed: wRow.hovered || workerActions.hovered
                 }
               }
             }

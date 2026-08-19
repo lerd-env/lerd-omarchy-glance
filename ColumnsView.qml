@@ -27,11 +27,13 @@ Item {
   implicitHeight: body.implicitHeight
 
   // A row that knows when the pointer is over it, so it can trade its
-  // trailing detail for the actions it offers. The hover area takes no
-  // buttons, so a click meant for an icon on top of it still lands there.
+  // trailing detail for the actions it offers. The pointer is tracked with a
+  // HoverHandler, not a MouseArea: an action icon sitting on the row carries
+  // its own MouseArea, which would take the hover away from a MouseArea here
+  // and leave the row hiding the very icon the pointer just reached.
   component Row_: Item {
     id: hoverRow
-    readonly property bool hovered: hoverArea.containsMouse
+    readonly property bool hovered: hoverArea.hovered
     width: parent ? parent.width : 100
     Rectangle {
       anchors.fill: parent
@@ -41,12 +43,7 @@ Item {
       visible: hoverRow.hovered
       color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
     }
-    MouseArea {
-      id: hoverArea
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-    }
+    HoverHandler { id: hoverArea }
   }
 
   // A single caption-sized line: label on the left, value on the right.
@@ -182,12 +179,13 @@ Item {
                 }
 
                 ActionRow {
+                  id: siteActions
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   requests: Actions.siteActions(siteRow.modelData)
                   panel: root.panel
                   foreground: root.foreground
-                  revealed: siteRow.hovered
+                  revealed: siteRow.hovered || siteActions.hovered
                 }
               }
             }
@@ -261,7 +259,7 @@ Item {
                   requests: Actions.serviceActions(svcRow.modelData)
                   panel: root.panel
                   foreground: root.foreground
-                  revealed: svcRow.hovered
+                  revealed: svcRow.hovered || svcActions.hovered
                 }
               }
             }
@@ -341,7 +339,7 @@ Item {
                       requests: Actions.workerActions(wRow.modelData)
                       panel: root.panel
                       foreground: root.foreground
-                      revealed: wRow.hovered
+                      revealed: wRow.hovered || workerActions.hovered
                     }
                   }
                 }

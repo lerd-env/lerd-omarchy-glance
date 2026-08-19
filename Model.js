@@ -92,6 +92,67 @@ var WORKER_KINDS = [
   ["stripe", "stripe_secret_set", "stripe_running"]
 ];
 
+// The workers a site declares, in the order the panel shows them, each with
+// whether lerd reports it running. Framework workers (Vite and friends) keep
+// their own label but count under the "framework" kind.
+function siteWorkers(site) {
+  var out = [];
+  for (var k = 0; k < WORKER_KINDS.length; k++) {
+    var kind = WORKER_KINDS[k];
+    if (site[kind[1]]) out.push({ kind: kind[0], label: kind[0], running: !!site[kind[2]] });
+  }
+  var extra = site.framework_workers || [];
+  for (var f = 0; f < extra.length; f++) {
+    out.push({ kind: "framework", label: extra[f].label || extra[f].name || "framework", running: !!extra[f].running });
+  }
+  return out;
+}
+
+// One row per site for the lists: the bits of /api/sites the panel shows.
+// Paused sites are included (the counts leave them out) so the list says
+// "paused" instead of silently hiding them.
+function siteRows(sites) {
+  sites = sites || [];
+  var out = [];
+  for (var i = 0; i < sites.length; i++) {
+    var site = sites[i];
+    out.push({
+      name: site.name || "",
+      domain: site.domain || "",
+      state: siteState(site),
+      php: site.php_version || "",
+      tls: !!site.tls,
+      pinned: !!site.pinned,
+      framework: site.framework_label || site.framework || "",
+      workers: siteWorkers(site)
+    });
+  }
+  return out;
+}
+
+// /api/services lists the per-site worker units next to the shared services,
+// each tagged with the site it belongs to. The tag also names the kind.
+var SERVICE_WORKER_TAGS = [
+  ["queue_site", "queue"],
+  ["horizon_site", "horizon"],
+  ["schedule_worker_site", "schedule"],
+  ["reverb_site", "reverb"],
+  ["stripe_listener_site", "stripe"]
+];
+
+function serviceGroup(svc) {
+  for (var i = 0; i < SERVICE_WORKER_TAGS.length; i++) {
+    var tag = SERVICE_WORKER_TAGS[i];
+    if (svc[tag[0]]) return { group: "worker", site: svc[tag[0]], kind: tag[1] };
+  }
+  if (svc.worker_site) {
+    var name = String(svc.worker_name || "");
+    var known = { queue: 1, horizon: 1, schedule: 1, reverb: 1, stripe: 1 };
+    return { group: "worker", site: svc.worker_site, kind: known[name] ? name : "framework", label: svc.worker_label || name };
+  }
+  return { group: "service", site: "", kind: "" };
+}
+
 function workerCounts(sites) {
   sites = sites || [];
   var tally = {}, order = [];
@@ -147,13 +208,18 @@ function summarize(payload) {
   }
   var workers = unhealthyWorkers(payload.health);
 
-  var servicesUp = 0, servicesDown = [], serviceRows = [];
+  // lerd can list the same worker unit twice (once under its kind, once as a
+  // framework worker), so rows are keyed by name and the first wins.
+  var servicesUp = 0, servicesDown = [], serviceRows = [], seen = {};
   services = services || [];
   for (var j = 0; j < services.length; j++) {
     var svc = services[j];
+    if (seen[svc.name]) continue;
+    seen[svc.name] = true;
     var up = serviceUp(svc.status);
     if (up) servicesUp++;
     else servicesDown.push({ name: svc.name, status: svc.status, broken: serviceBroken(svc.status) });
+    var grouping = serviceGroup(svc);
     serviceRows.push({
       name: svc.name,
       status: svc.status,
@@ -161,7 +227,11 @@ function summarize(payload) {
       broken: serviceBroken(svc.status),
       version: svc.version || "",
       port: svc.port || 0,
-      sites: svc.site_count || 0
+      sites: svc.site_count || 0,
+      group: grouping.group,
+      site: grouping.site,
+      kind: grouping.kind,
+      label: grouping.label || grouping.kind
     });
   }
 
@@ -180,7 +250,8 @@ function summarize(payload) {
   return {
     reachable: true,
     sites: { up: sitesUp, total: sitesTotal },
-    services: { up: servicesUp, total: services.length, down: servicesDown, list: serviceRows },
+    services: { up: servicesUp, total: serviceRows.length, down: servicesDown, list: serviceRows },
+    sitesList: siteRows(sites),
     workers: { down: workers, kinds: workerCounts(sites) },
     php: php,
     nginx: nginx,
@@ -210,6 +281,7 @@ function unreachable() {
   return {
     reachable: false,
     sites: { up: 0, total: 0 },
+    sitesList: [],
     services: { up: 0, total: 0, down: [], list: [] },
     workers: { down: [], kinds: [] },
     php: [],
@@ -241,4 +313,21 @@ function issues(summary) {
     out.push(w.site + " " + w.worker + " " + w.state);
   }
   return out;
+}
+
+// The services list split the way the panel draws it: shared services first,
+// then the worker units gathered under the site they belong to.
+function splitServices(list) {
+  var shared = [], bySite = {}, order = [];
+  list = list || [];
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i];
+    if (row.group !== "worker") { shared.push(row); continue; }
+    var key = row.site || "other";
+    if (!bySite[key]) { bySite[key] = []; order.push(key); }
+    bySite[key].push(row);
+  }
+  var grouped = [];
+  for (var j = 0; j < order.length; j++) grouped.push({ site: order[j], rows: bySite[order[j]] });
+  return { shared: shared, bySite: grouped, workerCount: list.length - shared.length };
 }

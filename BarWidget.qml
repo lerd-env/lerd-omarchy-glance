@@ -40,6 +40,7 @@ BarWidget {
     panelLoader.item.bar = root.bar
     panelLoader.item.anchorItem = button
     panelLoader.item.hostWidget = root
+    panelLoader.item.settings = root.settings
     panelLoader.item.summary = root.summary
   }
 
@@ -113,6 +114,7 @@ BarWidget {
   implicitHeight: button.implicitHeight
 
   onBarChanged: injectPanel()
+  onSettingsChanged: injectPanel()
 
   Component.onCompleted: refresh()
 

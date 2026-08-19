@@ -28,15 +28,17 @@ already running on your machine.
 
 ### In the panel
 
+- 🔀 **Two views, one toggle.** A dense table (400px, every row 20px, htop style) or three columns (720px: sites · services · environment and workers). The icon at the top right switches between them, `v` does the same, and the choice is remembered in the bar's settings.
+
 - 📊 **Resources.** Total CPU and memory across every lerd container, drawn as the same meters the dashboard uses, with the share of host memory and the container count.
 
-- 🌐 **Sites and services.** How many of each are running, with paused sites left out of the count instead of quietly failing it.
+- 🌐 **Sites and services.** How many of each are running, with paused sites left out of the count instead of quietly failing it — and the sites themselves listed with their PHP version, state and the workers they declare.
 
 - ⚙️ **Workers by type.** A counter and a glyph per kind: queue, horizon, schedule, reverb, Stripe, and framework workers such as Vite.
 
 - 🩺 **Environment health.** nginx, `.test` resolution and the file watcher, plus every installed PHP version with the default in bold.
 
-- 🗄️ **Services at a glance.** One row each with status, version and port.
+- 🗄️ **Services at a glance.** Shared services with status, version and port, then the per-site worker units gathered under their site instead of mixed into one long list. A unit lerd reports twice is shown once.
 
 - ⚠️ **Needs attention.** What is actually wrong, in plain words, and nothing at all when nothing is. A worker only counts as unhealthy when lerd itself says so, so a queue worker you never started is not reported as broken.
 
@@ -89,10 +91,13 @@ of QML imports, so it runs under node while the shell loads the same file:
 node --test test/model.test.mjs
 ```
 
-`BarWidget.qml` owns the polling and hands a finished summary to `Panel.qml`.
-`Meter.qml`, `StatRow.qml`, `StatusDot.qml` and `Mark.qml` are the pieces both
-are drawn from, and `Theme.js` holds the state palette, which follows the lerd
-dashboard's own colours.
+`BarWidget.qml` owns the polling and hands a finished summary to `Panel.qml`,
+which draws the header and the two buttons and loads one of the views:
+`DenseView.qml` (the table) or `ColumnsView.qml` (the three columns).
+`Meter.qml`, `StatRow.qml`, `StatusDot.qml`, `SectionTitle.qml`,
+`WorkerGlyph.qml`, `Flag.qml` and `Mark.qml` are the pieces they are drawn
+from, and `Theme.js` holds the state palette, which follows the lerd
+dashboard's own colours, plus the few glyphs the chrome needs.
 
 Validate a change the way the shell does before opening a pull request:
 

@@ -22,6 +22,14 @@ function flagColor(on) {
   return on ? ok : bad;
 }
 
+// Sites: emerald up, red down, sky suspended (idle), grey paused.
+function siteStateColor(state) {
+  if (state === "up") return ok;
+  if (state === "down") return bad;
+  if (state === "suspended") return idle;
+  return muted;
+}
+
 // Nerd Font glyphs for the worker kinds, and the dashboard's per-kind colours.
 var WORKER_GLYPHS = {
   queue: "\uf0ae",
@@ -61,4 +69,23 @@ function workerLabel(kind) {
 function workerColor(count) {
   if (count.running === 0) return muted;
   return WORKER_COLORS[count.kind] || ok;
+}
+
+function workerKindColor(kind, running) {
+  if (running === false) return muted;
+  return WORKER_COLORS[kind] || ok;
+}
+
+// Glyphs for the panel's own chrome (all present in the Nerd Font).
+var ICONS = {
+  "view-table": "\u{F0569}",     // nf-md-table_large: the dense table view
+  "view-columns": "\u{F0571}",   // nf-md-view_column: the three-column view
+  "caret-down": "\uf0d7",
+  "caret-right": "\uf0da",
+  "external-link": "\uf08e",
+  "broom": "\u{F00E2}"
+};
+
+function icon(name) {
+  return ICONS[name] || "";
 }

@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "Model.js" as Model
+import "Actions.js" as Actions
 import "Theme.js" as Theme
 
 // The wide view: the dashboard's two meters across the top, then Sites,
@@ -12,6 +13,10 @@ Item {
   property var summary: Model.unreachable()
   property color foreground: "white"
   property string fontFamily: Style.font.family
+  // Anything with run(request) and actionState; the panel forwards to the
+  // widget that owns the polling. Null in a preview, and then the rows are
+  // simply not actionable.
+  property var panel: null
 
   readonly property var issues: Model.issues(summary)
   readonly property var split: Model.splitServices(summary.services.list)
@@ -20,6 +25,29 @@ Item {
   readonly property int colHeight: Style.space(340)
 
   implicitHeight: body.implicitHeight
+
+  // A row that knows when the pointer is over it, so it can trade its
+  // trailing detail for the actions it offers. The hover area takes no
+  // buttons, so a click meant for an icon on top of it still lands there.
+  component Row_: Item {
+    id: hoverRow
+    readonly property bool hovered: hoverArea.containsMouse
+    width: parent ? parent.width : 100
+    Rectangle {
+      anchors.fill: parent
+      anchors.leftMargin: -Style.space(4)
+      anchors.rightMargin: -Style.space(4)
+      radius: Style.space(4)
+      visible: hoverRow.hovered
+      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+    }
+    MouseArea {
+      id: hoverArea
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+    }
+  }
 
   // A single caption-sized line: label on the left, value on the right.
   component Line: Item {
@@ -108,7 +136,7 @@ Item {
             width: parent.width
             Repeater {
               model: root.summary.sitesList
-              delegate: Item {
+              delegate: Row_ {
                 id: siteRow
                 required property var modelData
                 width: siteCol.width
@@ -152,6 +180,15 @@ Item {
                     }
                   }
                 }
+
+                ActionRow {
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  requests: Actions.siteActions(siteRow.modelData)
+                  panel: root.panel
+                  foreground: root.foreground
+                  revealed: siteRow.hovered
+                }
               }
             }
           }
@@ -180,7 +217,7 @@ Item {
 
             Repeater {
               model: root.split.shared
-              delegate: Item {
+              delegate: Row_ {
                 id: svcRow
                 required property var modelData
                 width: svcCol.width
@@ -209,11 +246,22 @@ Item {
                 Text {
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
+                  visible: !svcActions.visible
                   text: svcRow.modelData.version + (svcRow.modelData.port > 0 ? "  :" + svcRow.modelData.port : "")
                   color: root.foreground
                   opacity: 0.45
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
+                }
+
+                ActionRow {
+                  id: svcActions
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  requests: Actions.serviceActions(svcRow.modelData)
+                  panel: root.panel
+                  foreground: root.foreground
+                  revealed: svcRow.hovered
                 }
               }
             }
@@ -245,7 +293,7 @@ Item {
                 }
                 Repeater {
                   model: siteGroup.modelData.rows
-                  delegate: Item {
+                  delegate: Row_ {
                     id: wRow
                     required property var modelData
                     width: svcCol.width
@@ -274,6 +322,7 @@ Item {
                       anchors.right: parent.right
                       anchors.verticalCenter: parent.verticalCenter
                       spacing: Style.space(6)
+                      visible: !workerActions.visible
                       Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: !wRow.modelData.up
@@ -283,6 +332,16 @@ Item {
                         font.pixelSize: Style.font.caption
                       }
                       StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData) }
+                    }
+
+                    ActionRow {
+                      id: workerActions
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      requests: Actions.workerActions(wRow.modelData)
+                      panel: root.panel
+                      foreground: root.foreground
+                      revealed: wRow.hovered
                     }
                   }
                 }
@@ -378,6 +437,32 @@ Item {
               font.pixelSize: Style.font.bodySmall
               font.bold: true
             }
+          }
+        }
+
+        // Heal is the one bulk verb worth offering: it is lerd's own answer
+        // to the workers it just reported unhealthy, so it only appears when
+        // there are some.
+        Row_ {
+          visible: root.summary.workers.down.length > 0
+          width: parent.width
+          height: Style.space(20)
+          Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Heal " + root.summary.workers.down.length + " unhealthy"
+            color: root.foreground
+            opacity: 0.7
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+          ActionRow {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            requests: [Actions.heal()]
+            panel: root.panel
+            foreground: root.foreground
+            revealed: true
           }
         }
       }

@@ -78,6 +78,12 @@ function workerKindColor(kind, running) {
 
 // Glyphs for the panel's own chrome (all present in the Nerd Font).
 var ICONS = {
+  "play": "\uf04b",
+  "pause": "\uf04c",
+  "stop": "\uf04d",
+  "restart": "\uf021",
+  "heart-pulse": "\u{F05F6}",
+  "spinner": "\uf110",
   "view-table": "\u{F0569}",     // nf-md-table_large: the dense table view
   "view-columns": "\u{F0571}",   // nf-md-view_column: the three-column view
   "caret-down": "\uf0d7",

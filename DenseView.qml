@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "Model.js" as Model
+import "Actions.js" as Actions
 import "Theme.js" as Theme
 
 // The dense view: htop density in a 400px column. One line of meters, then a
@@ -13,6 +14,10 @@ Item {
   property var summary: Model.unreachable()
   property color foreground: "white"
   property string fontFamily: Style.font.family
+  // Anything with run(request) and actionState; the panel forwards to the
+  // widget that owns the polling. Null in a preview, and then the rows are
+  // simply not actionable.
+  property var panel: null
 
   readonly property var issues: Model.issues(summary)
   readonly property var split: Model.splitServices(summary.services.list)
@@ -141,12 +146,28 @@ Item {
     font.pixelSize: Style.font.bodySmall
   }
 
-  // A table row with a zebra stripe.
+  // A table row: a zebra stripe, and it knows when the pointer is over it so
+  // the row can trade its trailing detail for the actions it offers. The
+  // hover area takes no buttons, so it never swallows a click meant for an
+  // icon sitting on top of it.
   component TableRow: Item {
+    id: tableRow
     property int index: 0
+    readonly property bool hovered: hoverArea.containsMouse
     width: parent ? parent.width : 100
     height: root.rowH
-    Rectangle { anchors.fill: parent; color: index % 2 ? root.zebra : "transparent" }
+    Rectangle { anchors.fill: parent; color: tableRow.index % 2 ? root.zebra : "transparent" }
+    Rectangle {
+      anchors.fill: parent
+      visible: tableRow.hovered
+      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+    }
+    MouseArea {
+      id: hoverArea
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+    }
   }
 
   // One-letter environment flag: filled when on, outlined when off.
@@ -319,6 +340,7 @@ Item {
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(4)
+              visible: !siteActions.visible
               Repeater {
                 model: siteRow.modelData.workers
                 delegate: WorkerGlyph {
@@ -330,6 +352,17 @@ Item {
                   font.pixelSize: Style.font.caption
                 }
               }
+            }
+
+            ActionRow {
+              id: siteActions
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(4)
+              anchors.verticalCenter: parent.verticalCenter
+              requests: Actions.siteActions(siteRow.modelData)
+              panel: root.panel
+              foreground: root.foreground
+              revealed: siteRow.hovered
             }
           }
         }
@@ -379,6 +412,32 @@ Item {
                 font.bold: true
               }
             }
+          }
+        }
+
+        // Heal is the one bulk verb worth offering: it is lerd's own answer to
+        // the workers it just reported unhealthy, so it only appears when
+        // there are some.
+        TableRow {
+          id: healRow
+          visible: root.summary.workers.down.length > 0
+          Cell {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.colName
+            text: "heal " + root.summary.workers.down.length + " unhealthy"
+            dim: 0.5
+            font.pixelSize: Style.font.caption
+          }
+          ActionRow {
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            requests: [Actions.heal()]
+            panel: root.panel
+            foreground: root.foreground
+            revealed: true
           }
         }
 
@@ -464,8 +523,20 @@ Item {
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
+              visible: !svcActions.visible
               Cell { anchors.verticalCenter: parent.verticalCenter; width: Style.space(76); horizontalAlignment: Text.AlignRight; text: svcRow.modelData.version; dim: 0.5; font.pixelSize: Style.font.caption }
               Cell { anchors.verticalCenter: parent.verticalCenter; width: Style.space(44); horizontalAlignment: Text.AlignRight; text: svcRow.modelData.port > 0 ? ":" + svcRow.modelData.port : ""; dim: 0.5; font.pixelSize: Style.font.caption }
+            }
+
+            ActionRow {
+              id: svcActions
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(4)
+              anchors.verticalCenter: parent.verticalCenter
+              requests: Actions.serviceActions(svcRow.modelData)
+              panel: root.panel
+              foreground: root.foreground
+              revealed: svcRow.hovered
             }
           }
         }
@@ -505,6 +576,7 @@ Item {
                   anchors.rightMargin: Style.space(8)
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(6)
+                  visible: !workerActions.visible
                   Cell {
                     anchors.verticalCenter: parent.verticalCenter
                     text: wRow.modelData.up ? "" : (wRow.modelData.broken ? "failed" : wRow.modelData.status)
@@ -512,6 +584,17 @@ Item {
                     font.pixelSize: Style.font.caption
                   }
                   StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData) }
+                }
+
+                ActionRow {
+                  id: workerActions
+                  anchors.right: parent.right
+                  anchors.rightMargin: Style.space(4)
+                  anchors.verticalCenter: parent.verticalCenter
+                  requests: Actions.workerActions(wRow.modelData)
+                  panel: root.panel
+                  foreground: root.foreground
+                  revealed: wRow.hovered
                 }
               }
             }

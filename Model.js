@@ -143,14 +143,34 @@ var SERVICE_WORKER_TAGS = [
 function serviceGroup(svc) {
   for (var i = 0; i < SERVICE_WORKER_TAGS.length; i++) {
     var tag = SERVICE_WORKER_TAGS[i];
-    if (svc[tag[0]]) return { group: "worker", site: svc[tag[0]], kind: tag[1] };
+    if (svc[tag[0]]) return { group: "worker", site: svc[tag[0]], kind: tag[1], worker: tag[1] };
   }
   if (svc.worker_site) {
     var name = String(svc.worker_name || "");
     var known = { queue: 1, horizon: 1, schedule: 1, reverb: 1, stripe: 1 };
-    return { group: "worker", site: svc.worker_site, kind: known[name] ? name : "framework", label: svc.worker_label || name };
+    return {
+      group: "worker",
+      site: svc.worker_site,
+      kind: known[name] ? name : "framework",
+      // The unit's own name, which is what the generic worker verb takes for
+      // the framework workers whose name varies (vite, and whatever a site
+      // declares next to it).
+      worker: name,
+      label: svc.worker_label || name
+    };
   }
-  return { group: "service", site: "", kind: "" };
+  return { group: "service", site: "", kind: "", worker: "" };
+}
+
+// The domain a site name answers on. Worker units are tagged with the site's
+// name, but every verb they take is addressed by domain, and the two are not
+// interchangeable: scopey-env-2 answers on scopey-dev.test.
+function domainFor(sites, name) {
+  sites = sites || [];
+  for (var i = 0; i < sites.length; i++) {
+    if (sites[i].name === name) return sites[i].domain || "";
+  }
+  return "";
 }
 
 function workerCounts(sites) {
@@ -230,7 +250,9 @@ function summarize(payload) {
       sites: svc.site_count || 0,
       group: grouping.group,
       site: grouping.site,
+      domain: domainFor(sites, grouping.site),
       kind: grouping.kind,
+      worker: grouping.worker || "",
       label: grouping.label || grouping.kind
     });
   }

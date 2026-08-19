@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "Actions.js" as Actions
 import "Theme.js" as Theme
 
 // The popout. A thin header (mark, version, update, view toggle), then one of
@@ -21,6 +22,17 @@ Panel {
 
   readonly property string fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
+  // The views call run() on a request Actions.js built for one of their rows;
+  // actionState is what the icons bind to. Both live on the widget, which
+  // owns the HTTP and the polling, so an action survives switching views.
+  readonly property var actionState: root.hostWidget ? root.hostWidget.actionState : ({})
+  readonly property var cleanupRequest: Actions.cleanup()
+  readonly property bool cleanupBusy: root.actionState[root.cleanupRequest.key] === "busy"
+
+  function run(request) {
+    if (root.hostWidget) root.hostWidget.run(request)
+  }
+
   // "table" (dense, compact) or "columns" (wide). Persisted in settings.
   readonly property string view: String(setting("view", "table")) === "columns" ? "columns" : "table"
   readonly property string otherView: view === "columns" ? "table" : "columns"
@@ -34,8 +46,11 @@ Panel {
     root.controller.hide()
   }
 
+  // The reclaim removes images from the host, including dangling ones other
+  // workloads left behind, so this is the one verb in the panel that asks
+  // first.
   function cleanup() {
-    if (root.hostWidget) root.hostWidget.cleanup()
+    confirmCleanup.opened = true
   }
 
   function openDashboard() {
@@ -77,12 +92,49 @@ Panel {
     contentWidth: panel.fittedContentWidth(root.viewWidth)
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
+    ConfirmDialog {
+      id: confirmCleanup
+      anchors.fill: parent
+      z: 10
+      message: "Remove " + root.summary.cleanup.count + " images and reclaim " + root.summary.cleanup.label + "?"
+      confirmText: "Clean up"
+      foreground: root.barForeground
+      background: root.bar ? root.bar.background : Color.background
+      fontFamily: root.fontFamily
+      onCanceled: confirmCleanup.opened = false
+      onConfirmed: {
+        confirmCleanup.opened = false
+        root.run(root.cleanupRequest)
+      }
+    }
+
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
-      onTextKey: function(t) { if (t === "v") root.toggleView() }
+      // While the dialog is up it owns the keys, but through this component's
+      // own signals: attaching a second Keys handler here would shadow the
+      // one it dispatches from.
+      onCloseRequested: {
+        if (confirmCleanup.opened) confirmCleanup.opened = false
+        else root.close()
+      }
+      onMoveRequested: function(dx, dy) {
+        if (confirmCleanup.opened && dx !== 0)
+          confirmCleanup.selectedIndex = confirmCleanup.selectedIndex === 0 ? 1 : 0
+      }
+      onActivateRequested: {
+        if (!confirmCleanup.opened) return
+        if (confirmCleanup.selectedIndex === 0) confirmCleanup.canceled()
+        else confirmCleanup.confirmed()
+      }
+      onTabRequested: function(direction) {
+        if (confirmCleanup.opened) {
+          confirmCleanup.selectedIndex = confirmCleanup.selectedIndex === 0 ? 1 : 0
+          return
+        }
+        root.switchPanel(direction)
+      }
+      onTextKey: function(t) { if (t === "v" && !confirmCleanup.opened) root.toggleView() }
 
       Column {
         id: content
@@ -180,6 +232,7 @@ Panel {
             item.summary = Qt.binding(function() { return root.summary })
             item.foreground = Qt.binding(function() { return root.barForeground })
             item.fontFamily = Qt.binding(function() { return root.fontFamily })
+            item.panel = root
             item.width = Qt.binding(function() { return viewLoader.width })
           }
         }
@@ -212,7 +265,9 @@ Panel {
             visible: root.summary.cleanup.available
             width: (parent.width - parent.spacing) / 2
             text: "Clean up · " + root.summary.cleanup.label
-            iconText: Theme.icon("broom")
+            iconText: root.cleanupBusy ? Theme.icon("spinner") : Theme.icon("broom")
+            iconSpinning: root.cleanupBusy
+            enabled: !root.cleanupBusy
             bordered: true
             foreground: root.barForeground
             fontFamily: root.fontFamily

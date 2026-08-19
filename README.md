@@ -44,9 +44,13 @@ already running on your machine.
 
 ### Actions
 
+- 🖱️ **On the row it belongs to.** Hover a row and its verbs appear as icons on the right, in place of the detail they cover: pause, resume or restart a site; start or stop a worker; start, stop or restart a service. The icon spins while lerd works and turns red with the refusal as its tooltip when lerd says no, so a failure lands on the row that caused it.
+
+- 🩺 **Heal.** Offered only when lerd itself reports unhealthy workers, because it is lerd's own answer to exactly that.
+
 - 🚀 **Open dashboard.** Hands off to `xdg-open http://lerd.localhost`.
 
-- 🧹 **Clean up.** Appears only when lerd reports reclaimable disk space, shows how much, and lets lerd apply its own freshly inspected plan rather than calling podman itself.
+- 🧹 **Clean up.** Appears only when lerd reports reclaimable disk space, shows how much, asks before it runs — the reclaim removes images from the host, including dangling ones other workloads left behind — and then lets lerd apply its own freshly inspected plan rather than calling podman itself.
 
 ## Requirements
 
@@ -84,19 +88,23 @@ Open dashboard runs. That `xdg-open` is the only process it ever starts.
 
 ## Development
 
-All the logic that turns lerd's API into what you see lives in `Model.js`, free
-of QML imports, so it runs under node while the shell loads the same file:
+All the logic that turns lerd's API into what you see lives in `Model.js`, and
+the rules for which request a row turns into live in `Actions.js`. Both are
+free of QML imports, so they run under node while the shell loads the same
+files:
 
 ```sh
-node --test test/model.test.mjs
+node --test test/*.mjs
 ```
 
 `BarWidget.qml` owns the polling and hands a finished summary to `Panel.qml`,
 which draws the header and the two buttons and loads one of the views:
 `DenseView.qml` (the table) or `ColumnsView.qml` (the three columns).
-`Meter.qml`, `StatRow.qml`, `StatusDot.qml`, `SectionTitle.qml`,
-`WorkerGlyph.qml`, `Flag.qml` and `Mark.qml` are the pieces they are drawn
-from, and `Theme.js` holds the state palette, which follows the lerd
+`BarWidget.qml` is also the only place that speaks HTTP: the views call
+`run()` with a request `Actions.js` built, and bind their icons to the state
+it reports back. `Meter.qml`, `StatRow.qml`, `StatusDot.qml`,
+`SectionTitle.qml`, `WorkerGlyph.qml`, `Flag.qml`, `ActionIcon.qml`,
+`ActionRow.qml` and `Mark.qml` are the pieces they are drawn from, and `Theme.js` holds the state palette, which follows the lerd
 dashboard's own colours, plus the few glyphs the chrome needs.
 
 Validate a change the way the shell does before opening a pull request:

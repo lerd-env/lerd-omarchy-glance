@@ -217,7 +217,7 @@ test("service rows tell shared services from per-site worker units", () => {
   assert.deepEqual(Model.serviceGroup({ name: "schedule-shop", schedule_worker_site: "shop" }), { group: "worker", site: "shop", kind: "schedule", worker: "schedule" });
   assert.deepEqual(
     Model.serviceGroup({ name: "vite-shop", worker_site: "shop", worker_name: "vite", worker_label: "Vite" }),
-    { group: "worker", site: "shop", kind: "framework", worker: "vite", label: "Vite" }
+    { group: "worker", site: "shop", kind: "framework", worker: "vite", label: "Vite", worktree: "", worktreeDomain: "" }
   );
   assert.equal(Model.serviceGroup({ name: "horizon-shop", worker_site: "shop", worker_name: "horizon" }).kind, "horizon");
 });
@@ -270,4 +270,22 @@ test("a worker unit whose site is gone reports no domain", () => {
   });
   assert.equal(s.services.list[0].domain, "");
   assert.equal(Model.domainFor([], "ghost"), "");
+});
+
+test("a worktree worker unit keeps the worktree it belongs to", () => {
+  // worker_site is the PARENT's name for a worktree unit, so dropping
+  // worker_worktree here is what leaves Actions.js unable to tell the two
+  // units apart. lerd's dashboard reads both (stores/services.ts:746).
+  const g = Model.serviceGroup({
+    name: "vite-shop-feat-login",
+    worker_site: "shop",
+    worker_name: "vite",
+    worker_label: "Vite",
+    worker_worktree: "feat-login",
+    worker_worktree_domain: "feat-login.shop.test"
+  });
+  assert.equal(g.group, "worker");
+  assert.equal(g.site, "shop");
+  assert.equal(g.worktree, "feat-login");
+  assert.equal(g.worktreeDomain, "feat-login.shop.test");
 });

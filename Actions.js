@@ -60,7 +60,10 @@ function forWorker(row, start) {
   } else {
     action = row.kind + ":" + verb;
   }
-  return request("/api/sites/" + row.domain + "/" + action,
+  // A worktree unit is lerd-<worker>-<site>-<wt>; the site endpoint reaches it
+  // with ?branch=, and without one it resolves to the parent's unit instead.
+  var query = row.worktree ? "?branch=" + encodeURIComponent(row.worktree) : "";
+  return request("/api/sites/" + row.domain + "/" + action + query,
     start ? "Start worker" : "Stop worker",
     start ? "play" : "stop");
 }

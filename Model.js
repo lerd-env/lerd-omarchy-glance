@@ -156,7 +156,11 @@ function serviceGroup(svc) {
       // the framework workers whose name varies (vite, and whatever a site
       // declares next to it).
       worker: name,
-      label: svc.worker_label || name
+      label: svc.worker_label || name,
+      // A per-worktree unit is tagged with the PARENT's name, so without
+      // these two the row is indistinguishable from the parent's worker.
+      worktree: svc.worker_worktree || "",
+      worktreeDomain: svc.worker_worktree_domain || ""
     };
   }
   return { group: "service", site: "", kind: "", worker: "" };
@@ -253,6 +257,7 @@ function summarize(payload) {
       domain: domainFor(sites, grouping.site),
       kind: grouping.kind,
       worker: grouping.worker || "",
+      worktree: grouping.worktree || "",
       label: grouping.label || grouping.kind
     });
   }

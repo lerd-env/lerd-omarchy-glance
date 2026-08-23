@@ -132,3 +132,39 @@ test("an empty or unreadable body is not treated as a failure", () => {
   assert.deepEqual(Actions.verdict(null), { ok: true });
   assert.deepEqual(Actions.verdict("not json at all"), { ok: true });
 });
+
+// lerd tags a per-worktree worker unit with the PARENT site's name and a
+// separate worker_worktree (internal/ui/server.go:1731, locked by
+// framework_workers_test.go: "WorkerSite = rapids (parent for grouping)"),
+// so a worktree row that carries only site+worker is indistinguishable from
+// the parent's. lerd's own dashboard keeps them apart, reaching for
+// worker_worktree_domain before the parent's domain (stores/services.ts:750).
+const wtWorker = (over) => worker({
+  name: "vite-shop-feat-login", kind: "framework", worker: "vite",
+  worktree: "feat-login", worktreeDomain: "feat-login.shop.test", ...over
+});
+
+test("a worktree worker is not addressed as the parent's", () => {
+  const parent = Actions.forWorker(worker({ name: "vite-shop", kind: "framework", worker: "vite" }), false);
+  const child = Actions.forWorker(wtWorker(), false);
+  assert.notEqual(child.path, parent.path,
+    "the worktree row stops lerd-vite-shop instead of lerd-vite-shop-feat-login");
+});
+
+test("two rows for the same worker keep separate in-flight state", () => {
+  // key is what actionState is stored under, so a shared key spins both rows
+  // and shows one row's refusal on the other.
+  const parent = Actions.forWorker(worker({ name: "vite-shop", kind: "framework", worker: "vite" }), false);
+  const child = Actions.forWorker(wtWorker(), false);
+  assert.notEqual(child.key, parent.key);
+});
+
+test("a worktree worker names the worktree it belongs to", () => {
+  // Either shape passes: ?branch= on the parent's domain, which is what the
+  // site endpoint reads (server.go:4590), or the worktree's own domain.
+  const req = Actions.forWorker(wtWorker(), true);
+  assert.ok(
+    /[?&]branch=feat-login\b/.test(req.path) || req.path.indexOf("feat-login.shop.test") >= 0,
+    `request does not identify the worktree: ${req.path}`
+  );
+});

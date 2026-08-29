@@ -48,6 +48,8 @@ already running on your machine.
 
 - 🩺 **Heal.** Offered only when lerd itself reports unhealthy workers, because it is lerd's own answer to exactly that.
 
+- 🌐 **Open a site.** Clicking a site row opens the site itself, over https when it has a certificate and http when it does not.
+
 - 🚀 **Open dashboard.** Hands off to `xdg-open http://lerd.localhost`.
 
 - 🧹 **Clean up.** Appears only when lerd reports reclaimable disk space, shows how much, asks before it runs — the reclaim removes images from the host, including dangling ones other workloads left behind — and then lets lerd apply its own freshly inspected plan rather than calling podman itself.

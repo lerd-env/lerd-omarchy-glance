@@ -22,7 +22,9 @@ Item {
   readonly property var split: Model.splitServices(summary.services.list)
   readonly property int colGap: Style.space(14)
   readonly property int colWidth: Math.floor((width - colGap * 2) / 3)
-  readonly property int colHeight: Style.space(340)
+  // The scrollers cap at 340 rather than reserve it, so a short list does not
+  // leave the panel with a void under it.
+  readonly property int colHeight: Math.min(Style.space(340), Math.max(siteCol.implicitHeight, svcCol.implicitHeight))
 
   implicitHeight: body.implicitHeight
 
@@ -115,6 +117,7 @@ Item {
 
       // ── Sites ───────────────────────────────────────────────────────────
       Column {
+        visible: root.summary.sitesList.length > 0
         width: root.colWidth
         spacing: Style.space(4)
 
@@ -151,6 +154,7 @@ Item {
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
+                      font.underline: siteRow.hovered
                     }
                   }
                   Row {
@@ -187,6 +191,12 @@ Item {
                   foreground: root.foreground
                   revealed: siteRow.hovered || siteActions.hovered
                 }
+
+                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                TapHandler {
+                  enabled: !siteActions.hovered
+                  onTapped: root.panel.openUrl(Actions.siteUrl(siteRow.modelData))
+                }
               }
             }
           }
@@ -195,6 +205,7 @@ Item {
 
       // ── Services ────────────────────────────────────────────────────────
       Column {
+        visible: root.split.shared.length > 0 || root.split.workerCount > 0
         width: root.colWidth
         spacing: Style.space(4)
 
@@ -267,7 +278,7 @@ Item {
             SectionTitle {
               visible: root.split.workerCount > 0
               width: parent.width
-              text: "Worker containers"
+              text: "Site workers"
               count: String(root.split.workerCount)
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -395,9 +406,12 @@ Item {
           StatRow { visible: root.summary.nodeDefault !== ""; width: parent.width; label: "Node"; value: root.summary.nodeDefault; foreground: root.foreground; fontFamily: root.fontFamily }
         }
 
-        Rectangle { width: parent.width; height: 1; color: root.foreground; opacity: 0.12 }
+        Rectangle {
+          visible: root.summary.workers.kinds.length > 0
+          width: parent.width; height: 1; color: root.foreground; opacity: 0.12
+        }
 
-        SectionTitle { width: parent.width; text: "Workers"; foreground: root.foreground; fontFamily: root.fontFamily }
+        SectionTitle { visible: root.summary.workers.kinds.length > 0; width: parent.width; text: "Workers"; foreground: root.foreground; fontFamily: root.fontFamily }
 
         Repeater {
           model: root.summary.workers.kinds
@@ -466,17 +480,22 @@ Item {
       }
     }
 
-    Rectangle { width: parent.width; height: 1; color: root.foreground; opacity: 0.12 }
+    Rectangle {
+      visible: root.issues.length > 0
+      width: parent.width; height: 1; color: root.foreground; opacity: 0.12
+    }
 
-    // ── Needs attention, last, so it reads as the conclusion ─────────────
+    // ── Needs attention, last, so it reads as the conclusion. The section is
+    // the warning, so with nothing wrong it is not drawn at all.
     Column {
+      visible: root.issues.length > 0
       width: parent.width
       spacing: Style.space(3)
 
       SectionTitle {
         width: parent.width
-        text: root.issues.length > 0 ? "Needs attention" : "Nothing needs attention"
-        count: root.issues.length > 0 ? String(root.issues.length) : ""
+        text: "Needs attention"
+        count: String(root.issues.length)
         showDot: true
         dotColor: Theme.levelColor(root.summary.level)
         foreground: root.foreground

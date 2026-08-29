@@ -194,7 +194,7 @@ Item {
     width: parent.width
     spacing: Style.space(6)
 
-    // ── meters, one line ────────────────────────────────────────────────
+    // ── meters, one line: CPU on the left edge, memory on the right ─────
     Item {
       width: parent.width
       height: Style.space(16)
@@ -215,7 +215,12 @@ Item {
           text: root.summary.resources.cpu.toFixed(2) + "%"; color: root.foreground
           font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true
         }
-        Item { width: Style.space(4); height: 1 }
+      }
+
+      Row {
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.space(5)
         Text {
           anchors.verticalCenter: parent.verticalCenter
           text: "MEM"; color: root.foreground; opacity: 0.5
@@ -264,7 +269,8 @@ Item {
         spacing: 0
 
         // ATTENTION ──────────────────────────────────────────────────────
-        SecHdr { text: "Attention"; count: root.issues.length ? String(root.issues.length) : "" }
+        // The section is the warning; with nothing wrong there is nothing to say.
+        SecHdr { visible: root.issues.length > 0; text: "Attention"; count: String(root.issues.length) }
         Repeater {
           model: root.issues
           delegate: TableRow {
@@ -290,25 +296,8 @@ Item {
             }
           }
         }
-        TableRow {
-          visible: root.issues.length === 0
-          Row {
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(6)
-            StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.ok }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: "nothing needs attention"
-              color: root.foreground; opacity: 0.55
-              font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
-            }
-          }
-        }
-
         // SITES ──────────────────────────────────────────────────────────
-        SecHdr { text: "Sites"; count: root.summary.sites.up + "/" + root.summary.sites.total }
+        SecHdr { visible: root.summary.sitesList.length > 0; text: "Sites"; count: root.summary.sites.up + "/" + root.summary.sites.total }
         Repeater {
           model: root.summary.sitesList
           delegate: TableRow {
@@ -321,7 +310,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
               StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.siteStateColor(siteRow.modelData.state) }
-              Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colName; text: siteRow.modelData.name }
+              Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colName; text: siteRow.modelData.name; font.underline: siteRow.hovered }
               Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colPhp; text: siteRow.modelData.php; dim: 0.55; font.pixelSize: Style.font.caption }
               Cell {
                 anchors.verticalCenter: parent.verticalCenter
@@ -361,11 +350,17 @@ Item {
               foreground: root.foreground
               revealed: siteRow.hovered || siteActions.hovered
             }
+
+            HoverHandler { cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+              enabled: !siteActions.hovered
+              onTapped: root.panel.openUrl(Actions.siteUrl(siteRow.modelData))
+            }
           }
         }
 
         // WORKERS ────────────────────────────────────────────────────────
-        SecHdr { text: "Workers"; count: root.workersRunning + "/" + root.workersTotal }
+        SecHdr { visible: root.kinds.length > 0; text: "Workers"; count: root.workersRunning + "/" + root.workersTotal }
         Repeater {
           model: root.kinds
           delegate: TableRow {
@@ -393,12 +388,6 @@ Item {
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
-              Blocks {
-                anchors.verticalCenter: parent.verticalCenter
-                count: 7
-                percent: kindRow.modelData.total ? kindRow.modelData.running / kindRow.modelData.total * 100 : 0
-                fill: kindRow.down > 0 ? Theme.warn : Theme.ok
-              }
               Cell {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Style.space(30)
@@ -488,11 +477,12 @@ Item {
         }
         // SERVICES ───────────────────────────────────────────────────────
         SecHdr {
+          visible: root.split.shared.length > 0 || root.split.workerCount > 0
           text: "Services"
           count: root.summary.services.up + "/" + root.summary.services.total
           note: root.summary.resources.available ? root.summary.resources.count + " containers" : ""
         }
-        SubHdr { text: "shared" }
+        SubHdr { visible: root.split.shared.length > 0; text: "shared" }
         Repeater {
           model: root.split.shared
           delegate: TableRow {
@@ -538,7 +528,7 @@ Item {
           }
         }
 
-        SubHdr { visible: root.split.workerCount > 0; text: "containers · " + root.split.workerCount }
+        SubHdr { visible: root.split.workerCount > 0; text: "workers · " + root.split.workerCount }
         Repeater {
           model: root.split.bySite
           delegate: Column {

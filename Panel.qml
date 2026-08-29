@@ -53,9 +53,14 @@ Panel {
     confirmCleanup.opened = true
   }
 
-  function openDashboard() {
-    if (root.bar) root.bar.run("xdg-open http://lerd.localhost")
+  function openUrl(url) {
+    if (!url) return
+    if (root.bar) root.bar.run("xdg-open " + url)
     root.close()
+  }
+
+  function openDashboard() {
+    root.openUrl("http://lerd.localhost")
   }
 
   function switchPanel(direction) {

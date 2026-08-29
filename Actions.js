@@ -33,6 +33,15 @@ function forSite(site, action) {
   return null;
 }
 
+// Clicking a site row opens the site itself. lerd serves a TLS site over
+// https and the rest over http, and the domain is checked because the URL is
+// handed to a shell command.
+function siteUrl(site) {
+  if (!site || !site.domain) return "";
+  if (!/^[A-Za-z0-9.-]+$/.test(site.domain)) return "";
+  return (site.tls ? "https://" : "http://") + site.domain;
+}
+
 // The verbs a site row offers, in the order they are drawn. A paused site can
 // only be resumed; restarting one would start a site the user just stopped.
 function siteActions(site) {

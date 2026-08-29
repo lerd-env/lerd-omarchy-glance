@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 // these tests.
 const source = readFileSync(new URL("../Actions.js", import.meta.url), "utf8");
 const Actions = new Function(
-  source + "; return { forSite, siteActions, forWorker, workerActions, forService, serviceActions, heal, cleanup, verdict };"
+  source + "; return { forSite, siteActions, siteUrl, forWorker, workerActions, forService, serviceActions, heal, cleanup, verdict };"
 )();
 
 const site = (over) => ({ name: "shop", domain: "shop.test", state: "up", ...over });
@@ -167,4 +167,15 @@ test("a worktree worker names the worktree it belongs to", () => {
     /[?&]branch=feat-login\b/.test(req.path) || req.path.indexOf("feat-login.shop.test") >= 0,
     `request does not identify the worktree: ${req.path}`
   );
+});
+
+test("a site row opens the site over the scheme its certificate decides", () => {
+  assert.equal(Actions.siteUrl(site({ tls: true })), "https://shop.test");
+  assert.equal(Actions.siteUrl(site({ tls: false })), "http://shop.test");
+});
+
+test("a site with no usable domain opens nothing", () => {
+  assert.equal(Actions.siteUrl(site({ domain: "" })), "");
+  assert.equal(Actions.siteUrl(null), "");
+  assert.equal(Actions.siteUrl(site({ domain: "shop.test; rm -rf ~" })), "");
 });

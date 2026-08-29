@@ -13,8 +13,8 @@
 
 lerd Glance puts the state of your local PHP environment in the bar you are
 already looking at. A healthy environment stays quiet, a broken one is obvious
-from across the screen, and the whole thing talks to nothing but the lerd
-already running on your machine.
+from across the screen, a section with nothing in it is not drawn at all, and
+the whole thing talks to nothing but the lerd already running on your machine.
 
 ## Features
 
@@ -85,8 +85,10 @@ another port, change the `endpoint` property at the top of `BarWidget.qml`.
 
 Everything happens over loopback to the lerd instance already running as your
 user. The plugin sends no telemetry and contacts no third party. It changes
-nothing unless you press a button: the cleanup request, and the `xdg-open` that
-Open dashboard runs. That `xdg-open` is the only process it ever starts.
+nothing until you press something: the verbs on a row, heal and cleanup, all of
+which are requests to lerd's own API rather than anything the plugin does
+itself. The only process it ever starts is the `xdg-open` behind Open dashboard
+and a site row.
 
 ## Development
 

@@ -3,8 +3,14 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "Actions.js" as Actions
 import "Theme.js" as Theme
 
+// The popout. A thin header (mark, version, update, view toggle), then one of
+// two views of the same summary — the dense table (400px) or the three
+// columns (720px) — and the two actions at the bottom. The view choice is a
+// widget setting, so it survives restarts the same way the clock's format
+// does.
 Panel {
   id: root
   moduleName: "sh.lerd.glance"
@@ -16,6 +22,22 @@ Panel {
 
   readonly property string fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
+  // The views call run() on a request Actions.js built for one of their rows;
+  // actionState is what the icons bind to. Both live on the widget, which
+  // owns the HTTP and the polling, so an action survives switching views.
+  readonly property var actionState: root.hostWidget ? root.hostWidget.actionState : ({})
+  readonly property var cleanupRequest: Actions.cleanup()
+  readonly property bool cleanupBusy: root.actionState[root.cleanupRequest.key] === "busy"
+
+  function run(request) {
+    if (root.hostWidget) root.hostWidget.run(request)
+  }
+
+  // "table" (dense, compact) or "columns" (wide). Persisted in settings.
+  readonly property string view: String(setting("view", "table")) === "columns" ? "columns" : "table"
+  readonly property string otherView: view === "columns" ? "table" : "columns"
+  readonly property int viewWidth: Style.space(view === "columns" ? 720 : 400)
+
   function open() {
     root.controller.show()
   }
@@ -24,19 +46,45 @@ Panel {
     root.controller.hide()
   }
 
+  // The reclaim removes images from the host, including dangling ones other
+  // workloads left behind, so this is the one verb in the panel that asks
+  // first.
   function cleanup() {
-    if (root.hostWidget) root.hostWidget.cleanup()
+    confirmCleanup.opened = true
+  }
+
+  function openUrl(url) {
+    if (!url) return
+    if (root.bar) root.bar.run("xdg-open " + url)
+    root.close()
   }
 
   function openDashboard() {
-    if (root.bar) root.bar.run("xdg-open http://lerd.localhost")
-    root.close()
+    root.openUrl("http://lerd.localhost")
   }
 
   function switchPanel(direction) {
     if (root.bar && typeof root.bar.switchPanelFrom === "function")
       return root.bar.switchPanelFrom(root.hostWidget || root, direction)
     return false
+  }
+
+  // Same dance as the clock: apply locally first so the toggle is instant,
+  // then hand the entry to the shell, which writes shell.json and sends the
+  // same value back through the bar.
+  function persistSettings(values) {
+    var entry = { id: root.moduleName }
+    for (var existing in root.settings) if (existing !== "id") entry[existing] = root.settings[existing]
+    for (var key in values) entry[key] = values[key]
+
+    root.settings = entry
+    if (root.hostWidget && "settings" in root.hostWidget) root.hostWidget.settings = entry
+    if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
+      root.bar.shell.updateEntryInline(root.moduleName, entry)
+  }
+
+  function toggleView() {
+    persistSettings({ view: root.otherView })
   }
 
   KeyboardPanel {
@@ -46,60 +94,124 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(330))
+    contentWidth: panel.fittedContentWidth(root.viewWidth)
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
+
+    ConfirmDialog {
+      id: confirmCleanup
+      anchors.fill: parent
+      z: 10
+      message: "Remove " + root.summary.cleanup.count + " images and reclaim " + root.summary.cleanup.label + "?"
+      confirmText: "Clean up"
+      foreground: root.barForeground
+      background: root.bar ? root.bar.background : Color.background
+      fontFamily: root.fontFamily
+      onCanceled: confirmCleanup.opened = false
+      onConfirmed: {
+        confirmCleanup.opened = false
+        root.run(root.cleanupRequest)
+      }
+    }
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
+      // While the dialog is up it owns the keys, but through this component's
+      // own signals: attaching a second Keys handler here would shadow the
+      // one it dispatches from.
+      onCloseRequested: {
+        if (confirmCleanup.opened) confirmCleanup.opened = false
+        else root.close()
+      }
+      onMoveRequested: function(dx, dy) {
+        if (confirmCleanup.opened && dx !== 0)
+          confirmCleanup.selectedIndex = confirmCleanup.selectedIndex === 0 ? 1 : 0
+      }
+      onActivateRequested: {
+        if (!confirmCleanup.opened) return
+        if (confirmCleanup.selectedIndex === 0) confirmCleanup.canceled()
+        else confirmCleanup.confirmed()
+      }
+      onTabRequested: function(direction) {
+        if (confirmCleanup.opened) {
+          confirmCleanup.selectedIndex = confirmCleanup.selectedIndex === 0 ? 1 : 0
+          return
+        }
+        root.switchPanel(direction)
+      }
+      onTextKey: function(t) { if (t === "v" && !confirmCleanup.opened) root.toggleView() }
 
       Column {
         id: content
         width: parent.width
         spacing: Style.space(10)
 
-        // Header: the mark, the name, and the version with an update dot.
-        Row {
+        // Header: the mark, the name, the version with an update dot, and
+        // the toggle to the other view.
+        Item {
           width: parent.width
-          spacing: Style.space(6)
-
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "lerd"
-            color: root.barForeground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.subtitle
-            font.bold: true
-          }
-
-          Item {
-            width: parent.width - x - versionRow.width
-            height: 1
-            anchors.verticalCenter: parent.verticalCenter
-          }
+          height: Style.space(24)
 
           Row {
-            id: versionRow
+            anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(4)
-            visible: root.summary.update.current !== ""
+            spacing: Style.space(6)
 
-            StatusDot {
+            Text {
               anchors.verticalCenter: parent.verticalCenter
-              visible: root.summary.update.available
-              color: Theme.warn
+              text: "lerd"
+              color: root.barForeground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
             }
 
             Text {
-              text: root.summary.update.available
-                ? root.summary.update.latest + " available"
-                : root.summary.update.current
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.summary.update.current !== ""
+              text: "v" + root.summary.update.current
               color: root.barForeground
-              opacity: 0.6
+              opacity: 0.5
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
+            }
+          }
+
+          Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(8)
+
+            Row {
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(4)
+              visible: root.summary.update.available
+
+              StatusDot {
+                anchors.verticalCenter: parent.verticalCenter
+                color: Theme.warn
+              }
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.summary.update.latest + " available"
+                color: root.barForeground
+                opacity: 0.6
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            // The icon is the view you would switch to.
+            PanelActionButton {
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: Theme.icon(root.otherView === "columns" ? "view-columns" : "view-table")
+              tooltipText: root.otherView === "columns" ? "Three columns (v)" : "Dense table (v)"
+              foreground: root.barForeground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.body
+              size: Style.space(22)
+              bordered: true
+              onClicked: root.toggleView()
             }
           }
         }
@@ -115,270 +227,58 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        // Resources, laid out like the dashboard's two meters.
+        Loader {
+          id: viewLoader
+          width: parent.width
+          visible: root.summary.reachable
+          active: root.summary.reachable
+          source: Qt.resolvedUrl(root.view === "columns" ? "ColumnsView.qml" : "DenseView.qml")
+          onLoaded: {
+            item.summary = Qt.binding(function() { return root.summary })
+            item.foreground = Qt.binding(function() { return root.barForeground })
+            item.fontFamily = Qt.binding(function() { return root.fontFamily })
+            item.panel = root
+            item.width = Qt.binding(function() { return viewLoader.width })
+          }
+        }
+
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: root.barForeground
+          opacity: 0.12
+        }
+
+        // Open dashboard always; Clean up only when lerd says there is
+        // space to reclaim, and then side by side.
         Row {
           width: parent.width
-          spacing: Style.space(10)
-          visible: root.summary.reachable && root.summary.resources.available
+          spacing: Style.space(6)
 
-          Meter {
-            width: (parent.width - Style.space(10)) / 2
-            label: "CPU"
-            value: root.summary.resources.cpu.toFixed(2) + "%"
-            percent: root.summary.resources.cpuBar
-            fill: Theme.ok
+          Button {
+            width: root.summary.cleanup.available ? (parent.width - parent.spacing) / 2 : parent.width
+            text: "Open dashboard"
+            iconText: Theme.icon("external-link")
+            bordered: true
             foreground: root.barForeground
             fontFamily: root.fontFamily
-            caption: root.summary.resources.count + " containers"
-          }
-
-          Meter {
-            width: (parent.width - Style.space(10)) / 2
-            label: "Memory"
-            value: root.summary.resources.memLabel
-            percent: root.summary.resources.memPercent
-            fill: Theme.idle
-            foreground: root.barForeground
-            fontFamily: root.fontFamily
-            caption: root.summary.resources.memPercent.toFixed(1) + "% of " + root.summary.resources.hostLabel
-          }
-        }
-
-        Rectangle {
-          width: parent.width
-          height: 1
-          color: root.barForeground
-          opacity: 0.12
-          visible: root.summary.reachable
-        }
-
-        // Counts, workers and the environment, each as a left-right row.
-        Column {
-          width: parent.width
-          spacing: Style.space(5)
-          visible: root.summary.reachable
-
-          StatRow {
-            width: parent.width
-            label: "Sites"
-            value: root.summary.sites.up + "/" + root.summary.sites.total
-            foreground: root.barForeground
-            fontFamily: root.fontFamily
-          }
-
-          StatRow {
-            width: parent.width
-            label: "Services"
-            value: root.summary.services.up + "/" + root.summary.services.total
-            foreground: root.barForeground
-            fontFamily: root.fontFamily
-          }
-
-          Repeater {
-            model: root.summary.workers.kinds
-
-            StatRow {
-              width: parent.width
-              glyph: Theme.workerGlyph(modelData.kind)
-              glyphColor: Theme.workerColor(modelData)
-              label: Theme.workerLabel(modelData.kind)
-              value: modelData.running + "/" + modelData.total
-              foreground: root.barForeground
-              fontFamily: root.fontFamily
-            }
-          }
-
-          Repeater {
-            model: [
-              { label: "nginx", on: root.summary.nginx },
-              { label: "." + root.summary.tld + " resolution", on: root.summary.dns },
-              { label: "watcher", on: root.summary.watcher }
-            ]
-
-            StatRow {
-              width: parent.width
-              label: modelData.label
-              foreground: root.barForeground
-              fontFamily: root.fontFamily
-
-              StatusDot {
-                color: Theme.flagColor(modelData.on)
-              }
-            }
-          }
-
-          StatRow {
-            width: parent.width
-            label: "PHP"
-            foreground: root.barForeground
-            fontFamily: root.fontFamily
-
-            Repeater {
-              model: root.summary.php
-
-              Row {
-                spacing: Style.space(3)
-
-                StatusDot {
-                  anchors.verticalCenter: parent.verticalCenter
-                  size: 5
-                  color: Theme.flagColor(modelData.running)
-                }
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: modelData.version
-                  color: root.barForeground
-                  opacity: modelData.version === root.summary.phpDefault ? 1 : 0.6
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  font.bold: modelData.version === root.summary.phpDefault
-                }
-              }
-            }
-          }
-        }
-
-        Rectangle {
-          width: parent.width
-          height: 1
-          color: root.barForeground
-          opacity: 0.12
-          visible: root.summary.services.list.length > 0
-        }
-
-        // Services, one row each, the way the dashboard card lists them.
-        Column {
-          width: parent.width
-          spacing: Style.space(3)
-          visible: root.summary.services.list.length > 0
-
-          Repeater {
-            model: root.summary.services.list
-
-            Item {
-              width: parent.width
-              height: serviceName.implicitHeight
-
-              StatusDot {
-                id: serviceDot
-                anchors.verticalCenter: parent.verticalCenter
-                color: Theme.serviceColor(modelData)
-              }
-
-              Text {
-                id: serviceName
-                anchors.left: serviceDot.right
-                anchors.leftMargin: Style.space(6)
-                width: parent.width - Style.space(120)
-                text: modelData.name
-                color: root.barForeground
-                opacity: modelData.up ? 1 : 0.6
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-              }
-
-              Text {
-                anchors.right: servicePort.left
-                anchors.rightMargin: Style.space(10)
-                text: modelData.version
-                color: root.barForeground
-                opacity: 0.5
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-
-              Text {
-                id: servicePort
-                anchors.right: parent.right
-                text: modelData.port > 0 ? String(modelData.port) : ""
-                color: root.barForeground
-                opacity: 0.5
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-          }
-        }
-
-        // Anything wrong, last, so it reads as the conclusion.
-        Column {
-          width: parent.width
-          spacing: Style.space(3)
-          visible: Model.issues(root.summary).length > 0
-
-          Rectangle {
-            width: parent.width
-            height: 1
-            color: root.barForeground
-            opacity: 0.12
-          }
-
-          Text {
-            width: parent.width
-            text: "Needs attention"
-            color: Theme.levelColor(root.summary.level)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-          }
-
-          Repeater {
-            model: Model.issues(root.summary)
-
-            Text {
-              width: parent.width
-              text: modelData
-              color: root.barForeground
-              opacity: 0.8
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              wrapMode: Text.WordWrap
-            }
-          }
-        }
-
-        // Cleanup only appears when lerd says there is space to reclaim.
-        Column {
-          width: parent.width
-          spacing: Style.space(5)
-          visible: root.summary.cleanup.available
-
-          Rectangle {
-            width: parent.width
-            height: 1
-            color: root.barForeground
-            opacity: 0.12
-          }
-
-          StatRow {
-            width: parent.width
-            label: "Reclaimable"
-            value: root.summary.cleanup.label
-            foreground: root.barForeground
-            fontFamily: root.fontFamily
+            fontSize: Style.font.bodySmall
+            onClicked: root.openDashboard()
           }
 
           Button {
-            width: parent.width
-            text: "Clean up"
+            visible: root.summary.cleanup.available
+            width: (parent.width - parent.spacing) / 2
+            text: "Clean up · " + root.summary.cleanup.label
+            iconText: root.cleanupBusy ? Theme.icon("spinner") : Theme.icon("broom")
+            iconSpinning: root.cleanupBusy
+            enabled: !root.cleanupBusy
             bordered: true
             foreground: root.barForeground
             fontFamily: root.fontFamily
             fontSize: Style.font.bodySmall
             onClicked: root.cleanup()
           }
-        }
-
-        Button {
-          width: parent.width
-          text: "Open dashboard"
-          bordered: true
-          foreground: root.barForeground
-          fontFamily: root.fontFamily
-          fontSize: Style.font.bodySmall
-          onClicked: root.openDashboard()
         }
       }
     }

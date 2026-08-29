@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 // Evaluating the source keeps the file usable by the shell and by these tests.
 const source = readFileSync(new URL("../Model.js", import.meta.url), "utf8");
 const Model = new Function(
-  source + "; return { summarize, unreachable, issues, siteState, unhealthyWorkers, resources, formatBytes, workerCounts, cleanup };"
+  source + "; return { summarize, unreachable, issues, siteState, unhealthyWorkers, resources, formatBytes, workerCounts, cleanup, siteRows, serviceGroup, splitServices, domainFor };"
 )();
 
 const status = {
@@ -190,4 +190,102 @@ test("cleanup is only offered when there is something to reclaim", () => {
 
 test("a host that cannot report disk offers no cleanup", () => {
   assert.equal(Model.cleanup({ available: false, reclaimable_bytes: 500 }).available, false);
+});
+
+test("the site list keeps every site, with its state, PHP and workers", () => {
+  const s = Model.summarize({
+    status,
+    sites: [
+      site({ php_version: "8.5", tls: true, has_queue_worker: true, queue_running: true, framework_workers: [{ name: "vite", label: "Vite", running: false }] }),
+      site({ name: "old", domain: "old.test", paused: true, php_version: "8.2" })
+    ]
+  });
+  assert.equal(s.sitesList.length, 2);
+  assert.deepEqual(s.sitesList[0].workers, [
+    { kind: "queue", label: "queue", running: true },
+    { kind: "framework", label: "Vite", running: false }
+  ]);
+  assert.equal(s.sitesList[0].php, "8.5");
+  assert.equal(s.sitesList[0].tls, true);
+  assert.equal(s.sitesList[1].state, "paused");
+  assert.equal(s.sites.total, 1);
+});
+
+test("service rows tell shared services from per-site worker units", () => {
+  assert.deepEqual(Model.serviceGroup({ name: "redis" }), { group: "service", site: "", kind: "", worker: "" });
+  assert.deepEqual(Model.serviceGroup({ name: "queue-shop", queue_site: "shop" }), { group: "worker", site: "shop", kind: "queue", worker: "queue" });
+  assert.deepEqual(Model.serviceGroup({ name: "schedule-shop", schedule_worker_site: "shop" }), { group: "worker", site: "shop", kind: "schedule", worker: "schedule" });
+  assert.deepEqual(
+    Model.serviceGroup({ name: "vite-shop", worker_site: "shop", worker_name: "vite", worker_label: "Vite" }),
+    { group: "worker", site: "shop", kind: "framework", worker: "vite", label: "Vite", worktree: "", worktreeDomain: "" }
+  );
+  assert.equal(Model.serviceGroup({ name: "horizon-shop", worker_site: "shop", worker_name: "horizon" }).kind, "horizon");
+});
+
+test("a worker unit lerd lists twice is counted once", () => {
+  const s = Model.summarize({
+    status,
+    services: [
+      { name: "redis", status: "active", port: 6379 },
+      { name: "horizon-shop", status: "active", horizon_site: "shop" },
+      { name: "horizon-shop", status: "active", worker_site: "shop", worker_name: "horizon" },
+      { name: "vite-shop", status: "inactive", worker_site: "shop", worker_name: "vite", worker_label: "Vite" }
+    ]
+  });
+  assert.equal(s.services.total, 3);
+  assert.equal(s.services.up, 2);
+  assert.equal(s.services.list[1].group, "worker");
+  assert.equal(s.services.list[1].kind, "horizon");
+  assert.equal(s.services.list[2].label, "Vite");
+  const split = Model.splitServices(s.services.list);
+  assert.deepEqual(split.shared.map((r) => r.name), ["redis"]);
+  assert.deepEqual(split.bySite.map((g) => g.site), ["shop"]);
+  assert.equal(split.bySite[0].rows.length, 2);
+  assert.equal(split.workerCount, 2);
+});
+
+test("a worker unit carries the domain its site answers on", () => {
+  const s = Model.summarize({
+    status,
+    // The name is not the domain here, which is the whole point: a worker
+    // verb posted to /api/sites/scopey-env-2/... would 404.
+    sites: [site({ name: "scopey-env-2", domain: "scopey-dev.test", has_horizon: true, horizon_running: true })],
+    services: [
+      { name: "redis", status: "active" },
+      { name: "horizon-scopey-env-2", status: "active", horizon_site: "scopey-env-2" },
+      { name: "vite-scopey-env-2", status: "inactive", worker_site: "scopey-env-2", worker_name: "vite", worker_label: "Vite" }
+    ]
+  });
+  assert.equal(s.services.list[0].domain, "");
+  assert.equal(s.services.list[1].domain, "scopey-dev.test");
+  assert.equal(s.services.list[2].domain, "scopey-dev.test");
+  assert.equal(s.services.list[2].worker, "vite");
+});
+
+test("a worker unit whose site is gone reports no domain", () => {
+  const s = Model.summarize({
+    status,
+    sites: [],
+    services: [{ name: "queue-ghost", status: "failed", queue_site: "ghost" }]
+  });
+  assert.equal(s.services.list[0].domain, "");
+  assert.equal(Model.domainFor([], "ghost"), "");
+});
+
+test("a worktree worker unit keeps the worktree it belongs to", () => {
+  // worker_site is the PARENT's name for a worktree unit, so dropping
+  // worker_worktree here is what leaves Actions.js unable to tell the two
+  // units apart. lerd's dashboard reads both (stores/services.ts:746).
+  const g = Model.serviceGroup({
+    name: "vite-shop-feat-login",
+    worker_site: "shop",
+    worker_name: "vite",
+    worker_label: "Vite",
+    worker_worktree: "feat-login",
+    worker_worktree_domain: "feat-login.shop.test"
+  });
+  assert.equal(g.group, "worker");
+  assert.equal(g.site, "shop");
+  assert.equal(g.worktree, "feat-login");
+  assert.equal(g.worktreeDomain, "feat-login.shop.test");
 });

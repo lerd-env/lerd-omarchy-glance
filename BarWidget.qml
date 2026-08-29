@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "Actions.js" as Actions
 import "Theme.js" as Theme
 
 BarWidget {
@@ -11,6 +12,12 @@ BarWidget {
 
   property string endpoint: "http://127.0.0.1:7073"
   property var summary: Model.unreachable()
+
+  // What each action is doing right now, keyed by request: "busy" while it is
+  // in flight, or the message lerd refused with, kept around long enough to
+  // read. Rows bind to this, so the state shows on the row it belongs to and
+  // survives switching views.
+  property var actionState: ({})
 
   readonly property bool opened: panelLoader.item
     ? panelLoader.item.opened === true
@@ -40,6 +47,7 @@ BarWidget {
     panelLoader.item.bar = root.bar
     panelLoader.item.anchorItem = button
     panelLoader.item.hostWidget = root
+    panelLoader.item.settings = root.settings
     panelLoader.item.summary = root.summary
   }
 
@@ -86,16 +94,71 @@ BarWidget {
     getJson("/api/disk", function(v) { settle("disk", v, false) })
   }
 
-  // lerd re-inspects the host and applies its own fresh plan, so the button
-  // sends nothing but the CSRF header the dashboard API expects.
-  function cleanup() {
+  // lerd answers 200 even when it refuses, so the body is what decides, and
+  // the request carries the CSRF header every mutation needs. Nothing here
+  // knows which endpoint belongs to which row; Actions.js owns that.
+  function run(request) {
+    if (!request || root.actionState[request.key] === "busy") return
+    root.setActionState(request.key, "busy")
+
     var xhr = new XMLHttpRequest()
     xhr.onreadystatechange = function() {
-      if (xhr.readyState === XMLHttpRequest.DONE) root.refresh()
+      if (xhr.readyState !== XMLHttpRequest.DONE) return
+      var result = xhr.status === 200
+        ? Actions.verdict(xhr.responseText)
+        : { ok: false, error: xhr.status === 0 ? "lerd is not answering" : "lerd answered " + xhr.status }
+      root.setActionState(request.key, result.ok ? null : result.error)
+      if (!result.ok) forgetError.restart()
+      root.refreshBurst()
     }
-    xhr.open("POST", root.endpoint + "/api/disk")
+    xhr.open(request.method, root.endpoint + request.path)
     xhr.setRequestHeader("X-Lerd-CSRF", "1")
     xhr.send()
+  }
+
+  // Replaced wholesale rather than mutated, so bindings on actionState see
+  // the change.
+  function setActionState(key, value) {
+    var next = {}
+    for (var k in root.actionState) next[k] = root.actionState[k]
+    if (value === null) delete next[key]
+    else next[key] = value
+    root.actionState = next
+  }
+
+  // Some verbs return before the unit is up — queue:start hands off to a
+  // goroutine — so a single refresh would paint the state we just left.
+  function refreshBurst() {
+    root.refresh()
+    burst.round = 0
+    burst.restart()
+  }
+
+  function cleanup() {
+    root.run(Actions.cleanup())
+  }
+
+  Timer {
+    id: burst
+    property int round: 0
+    interval: 1500
+    repeat: true
+    onTriggered: {
+      root.refresh()
+      if (++round >= 2) stop()
+    }
+  }
+
+  // Errors are worth reading, not worth keeping: they clear on their own so a
+  // stale red icon never outlives the problem.
+  Timer {
+    id: forgetError
+    interval: 6000
+    onTriggered: {
+      var next = {}
+      for (var k in root.actionState) if (root.actionState[k] === "busy") next[k] = "busy"
+      root.actionState = next
+    }
   }
 
   function tooltip() {
@@ -113,6 +176,7 @@ BarWidget {
   implicitHeight: button.implicitHeight
 
   onBarChanged: injectPanel()
+  onSettingsChanged: injectPanel()
 
   Component.onCompleted: refresh()
 

@@ -22,6 +22,13 @@ Panel {
 
   readonly property string fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
+  // The popout is painted on the popup surface, so its contents take the
+  // popup's own colours. `barForeground` is not the same thing: over a
+  // transparent bar it is adapted to the wallpaper behind the bar, which on a
+  // light wallpaper left the panel with near-black text on a dark card.
+  readonly property color foreground: Color.popups.text
+  readonly property color background: Color.popups.background
+
   // The views call run() on a request Actions.js built for one of their rows;
   // actionState is what the icons bind to. Both live on the widget, which
   // owns the HTTP and the polling, so an action survives switching views.
@@ -103,8 +110,8 @@ Panel {
       z: 10
       message: "Remove " + root.summary.cleanup.count + " images and reclaim " + root.summary.cleanup.label + "?"
       confirmText: "Clean up"
-      foreground: root.barForeground
-      background: root.bar ? root.bar.background : Color.background
+      foreground: root.foreground
+      background: root.background
       fontFamily: root.fontFamily
       onCanceled: confirmCleanup.opened = false
       onConfirmed: {
@@ -160,7 +167,7 @@ Panel {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: "lerd"
-              color: root.barForeground
+              color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.subtitle
               font.bold: true
@@ -170,7 +177,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               visible: root.summary.update.current !== ""
               text: "v" + root.summary.update.current
-              color: root.barForeground
+              color: root.foreground
               opacity: 0.5
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -194,7 +201,7 @@ Panel {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.summary.update.latest + " available"
-                color: root.barForeground
+                color: root.foreground
                 opacity: 0.6
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -206,7 +213,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               iconText: Theme.icon(root.otherView === "columns" ? "view-columns" : "view-table")
               tooltipText: root.otherView === "columns" ? "Three columns (v)" : "Dense table (v)"
-              foreground: root.barForeground
+              foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.body
               size: Style.space(22)
@@ -220,7 +227,7 @@ Panel {
           width: parent.width
           visible: !root.summary.reachable
           text: "The dashboard is not running. Start it with lerd start."
-          color: root.barForeground
+          color: root.foreground
           opacity: 0.7
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
@@ -235,7 +242,7 @@ Panel {
           source: Qt.resolvedUrl(root.view === "columns" ? "ColumnsView.qml" : "DenseView.qml")
           onLoaded: {
             item.summary = Qt.binding(function() { return root.summary })
-            item.foreground = Qt.binding(function() { return root.barForeground })
+            item.foreground = Qt.binding(function() { return root.foreground })
             item.fontFamily = Qt.binding(function() { return root.fontFamily })
             item.panel = root
             item.width = Qt.binding(function() { return viewLoader.width })
@@ -245,7 +252,7 @@ Panel {
         Rectangle {
           width: parent.width
           height: 1
-          color: root.barForeground
+          color: root.foreground
           opacity: 0.12
         }
 
@@ -260,7 +267,7 @@ Panel {
             text: "Open dashboard"
             iconText: Theme.icon("external-link")
             bordered: true
-            foreground: root.barForeground
+            foreground: root.foreground
             fontFamily: root.fontFamily
             fontSize: Style.font.bodySmall
             onClicked: root.openDashboard()
@@ -274,7 +281,7 @@ Panel {
             iconSpinning: root.cleanupBusy
             enabled: !root.cleanupBusy
             bordered: true
-            foreground: root.barForeground
+            foreground: root.foreground
             fontFamily: root.fontFamily
             fontSize: Style.font.bodySmall
             onClicked: root.cleanup()

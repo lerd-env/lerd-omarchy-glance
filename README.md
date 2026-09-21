@@ -24,7 +24,7 @@ the whole thing talks to nothing but the lerd already running on your machine.
 
 - 🖱️ **Hover for the short version.** Site and service counts, CPU, memory, and the list of problems, without opening anything.
 
-- 🌗 **Monochrome and theme-aware.** The mark takes the bar's foreground, so it looks right in every Omarchy theme.
+- 🌗 **Monochrome and theme-aware.** The mark takes the bar's foreground and the panel takes the popup surface's, so both look right in every Omarchy theme, light or dark.
 
 ### In the panel
 

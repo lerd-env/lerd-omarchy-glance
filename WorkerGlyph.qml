@@ -7,10 +7,11 @@ import "Theme.js" as Theme
 Text {
   property string kind: "queue"
   property bool running: true
+  property bool lightSurface: false
   property string fontFamily: Style.font.family
 
   text: Theme.workerGlyph(kind)
-  color: Theme.workerKindColor(kind, running)
+  color: Theme.workerKindColor(kind, running, lightSurface)
   font.family: fontFamily
   font.pixelSize: Style.font.bodySmall
 }

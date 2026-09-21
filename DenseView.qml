@@ -13,6 +13,10 @@ Item {
 
   property var summary: Model.unreachable()
   property color foreground: "white"
+  // True when the popup card is a light surface, which picks the darker set
+  // of the same state colours.
+  property bool lightSurface: false
+  readonly property var stateColors: Theme.palette(root.lightSurface)
   property string fontFamily: Style.font.family
   // Anything with run(request) and actionState; the panel forwards to the
   // widget that owns the polling. Null in a preview, and then the rows are
@@ -43,9 +47,9 @@ Item {
   }
 
   function pctColor(p) {
-    if (p >= 85) return Theme.bad
-    if (p >= 60) return Theme.warn
-    return Theme.ok
+    if (p >= 85) return root.stateColors.bad
+    if (p >= 60) return root.stateColors.warn
+    return root.stateColors.ok
   }
 
   // ── pieces ───────────────────────────────────────────────────────────────
@@ -55,7 +59,7 @@ Item {
     id: blocks
     property real percent: 0
     property int count: 8
-    property color fill: Theme.ok
+    property color fill: root.stateColors.ok
     readonly property int filled: Math.round(Math.max(0, Math.min(100, percent)) / 100 * count)
     spacing: 1
     Repeater {
@@ -175,7 +179,7 @@ Item {
     width: Style.space(15)
     height: Style.space(14)
     radius: 2
-    color: on ? Theme.ok : "transparent"
+    color: on ? root.stateColors.ok : "transparent"
     border.width: on ? 0 : 1
     border.color: root.faint
     Text {
@@ -285,7 +289,7 @@ Item {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "!"
-                color: /failed|down|not running/.test(issueRow.modelData) ? Theme.bad : Theme.warn
+                color: /failed|down|not running/.test(issueRow.modelData) ? root.stateColors.bad : root.stateColors.warn
                 font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true
               }
               Cell {
@@ -309,14 +313,14 @@ Item {
               anchors.leftMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
-              StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.siteStateColor(siteRow.modelData.state) }
+              StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.siteStateColor(siteRow.modelData.state, root.lightSurface) }
               Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colName; text: siteRow.modelData.name; font.underline: siteRow.hovered }
               Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colPhp; text: siteRow.modelData.php; dim: 0.55; font.pixelSize: Style.font.caption }
               Cell {
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.colState
                 text: root.shortState(siteRow.modelData.state)
-                color: Theme.siteStateColor(siteRow.modelData.state)
+                color: Theme.siteStateColor(siteRow.modelData.state, root.lightSurface)
                 dim: siteRow.modelData.state === "up" ? 0.7 : 1
                 font.pixelSize: Style.font.caption
               }
@@ -331,6 +335,7 @@ Item {
                 model: siteRow.modelData.workers
                 delegate: WorkerGlyph {
                   required property var modelData
+                  lightSurface: root.lightSurface
                   anchors.verticalCenter: parent.verticalCenter
                   kind: modelData.kind
                   running: modelData.running
@@ -342,6 +347,7 @@ Item {
 
             ActionRow {
               id: siteActions
+              lightSurface: root.lightSurface
               anchors.right: parent.right
               anchors.rightMargin: Style.space(4)
               anchors.verticalCenter: parent.verticalCenter
@@ -374,6 +380,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
               WorkerGlyph {
+                lightSurface: root.lightSurface
                 anchors.verticalCenter: parent.verticalCenter
                 width: Style.space(12)
                 kind: kindRow.modelData.kind
@@ -393,7 +400,7 @@ Item {
                 width: Style.space(30)
                 horizontalAlignment: Text.AlignRight
                 text: kindRow.modelData.running + "/" + kindRow.modelData.total
-                color: kindRow.down > 0 ? Theme.warn : Theme.ok
+                color: kindRow.down > 0 ? root.stateColors.warn : root.stateColors.ok
                 font.pixelSize: Style.font.caption
                 font.bold: true
               }
@@ -417,6 +424,7 @@ Item {
             font.pixelSize: Style.font.caption
           }
           ActionRow {
+            lightSurface: root.lightSurface
             anchors.right: parent.right
             anchors.rightMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
@@ -461,7 +469,7 @@ Item {
                 required property var modelData
                 readonly property bool isDefault: modelData.version === root.summary.phpDefault
                 spacing: Style.space(3)
-                StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.flagColor(phpItem.modelData.running) }
+                StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.flagColor(phpItem.modelData.running, root.lightSurface) }
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: phpItem.modelData.version
@@ -494,14 +502,14 @@ Item {
               anchors.leftMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
-              StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(svcRow.modelData) }
+              StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(svcRow.modelData, root.lightSurface) }
               Cell { anchors.verticalCenter: parent.verticalCenter; width: root.colName; text: svcRow.modelData.name }
               Cell {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !svcRow.modelData.up
                 width: Style.space(60)
                 text: svcRow.modelData.broken ? "failed" : svcRow.modelData.status
-                color: Theme.serviceColor(svcRow.modelData)
+                color: Theme.serviceColor(svcRow.modelData, root.lightSurface)
                 font.pixelSize: Style.font.caption
               }
             }
@@ -517,6 +525,7 @@ Item {
 
             ActionRow {
               id: svcActions
+              lightSurface: root.lightSurface
               anchors.right: parent.right
               anchors.rightMargin: Style.space(4)
               anchors.verticalCenter: parent.verticalCenter
@@ -549,6 +558,7 @@ Item {
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(6)
                   WorkerGlyph {
+                    lightSurface: root.lightSurface
                     anchors.verticalCenter: parent.verticalCenter
                     width: Style.space(12)
                     kind: wRow.modelData.kind
@@ -567,14 +577,15 @@ Item {
                   Cell {
                     anchors.verticalCenter: parent.verticalCenter
                     text: wRow.modelData.up ? "" : (wRow.modelData.broken ? "failed" : wRow.modelData.status)
-                    color: Theme.serviceColor(wRow.modelData)
+                    color: Theme.serviceColor(wRow.modelData, root.lightSurface)
                     font.pixelSize: Style.font.caption
                   }
-                  StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData) }
+                  StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData, root.lightSurface) }
                 }
 
                 ActionRow {
                   id: workerActions
+                  lightSurface: root.lightSurface
                   anchors.right: parent.right
                   anchors.rightMargin: Style.space(4)
                   anchors.verticalCenter: parent.verticalCenter

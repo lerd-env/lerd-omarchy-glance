@@ -12,6 +12,10 @@ Item {
 
   property var summary: Model.unreachable()
   property color foreground: "white"
+  // True when the popup card is a light surface, which picks the darker set
+  // of the same state colours.
+  property bool lightSurface: false
+  readonly property var stateColors: Theme.palette(root.lightSurface)
   property string fontFamily: Style.font.family
   // Anything with run(request) and actionState; the panel forwards to the
   // widget that owns the polling. Null in a preview, and then the rows are
@@ -92,7 +96,7 @@ Item {
         label: "CPU"
         value: root.summary.resources.cpu.toFixed(2) + "%"
         percent: root.summary.resources.cpuBar
-        fill: Theme.ok
+        fill: root.stateColors.ok
         foreground: root.foreground
         fontFamily: root.fontFamily
         caption: root.summary.resources.count + " containers"
@@ -102,7 +106,7 @@ Item {
         label: "Memory"
         value: root.summary.resources.memLabel
         percent: root.summary.resources.memPercent
-        fill: Theme.idle
+        fill: root.stateColors.idle
         foreground: root.foreground
         fontFamily: root.fontFamily
         caption: root.summary.resources.memPercent.toFixed(1) + "% of " + root.summary.resources.hostLabel
@@ -147,7 +151,7 @@ Item {
                   spacing: Style.space(1)
                   Row {
                     spacing: Style.space(6)
-                    StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.siteStateColor(siteRow.modelData.state) }
+                    StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.siteStateColor(siteRow.modelData.state, root.lightSurface) }
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
                       text: siteRow.modelData.name
@@ -172,6 +176,7 @@ Item {
                       model: siteRow.modelData.workers
                       delegate: WorkerGlyph {
                         required property var modelData
+                        lightSurface: root.lightSurface
                         anchors.verticalCenter: parent.verticalCenter
                         kind: modelData.kind
                         running: modelData.running
@@ -184,6 +189,7 @@ Item {
 
                 ActionRow {
                   id: siteActions
+                  lightSurface: root.lightSurface
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   requests: Actions.siteActions(siteRow.modelData)
@@ -235,7 +241,7 @@ Item {
                   anchors.left: parent.left
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(6)
-                  StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(svcRow.modelData) }
+                  StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(svcRow.modelData, root.lightSurface) }
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: svcRow.modelData.name
@@ -247,7 +253,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: !svcRow.modelData.up
                     text: svcRow.modelData.broken ? "failed" : svcRow.modelData.status
-                    color: Theme.serviceColor(svcRow.modelData)
+                    color: Theme.serviceColor(svcRow.modelData, root.lightSurface)
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
                   }
@@ -265,6 +271,7 @@ Item {
 
                 ActionRow {
                   id: svcActions
+                  lightSurface: root.lightSurface
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   requests: Actions.serviceActions(svcRow.modelData)
@@ -313,6 +320,7 @@ Item {
                       anchors.verticalCenter: parent.verticalCenter
                       spacing: Style.space(6)
                       WorkerGlyph {
+                        lightSurface: root.lightSurface
                         anchors.verticalCenter: parent.verticalCenter
                         kind: wRow.modelData.kind
                         running: wRow.modelData.up
@@ -336,15 +344,16 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: !wRow.modelData.up
                         text: wRow.modelData.broken ? "failed" : wRow.modelData.status
-                        color: Theme.serviceColor(wRow.modelData)
+                        color: Theme.serviceColor(wRow.modelData, root.lightSurface)
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.caption
                       }
-                      StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData) }
+                      StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.serviceColor(wRow.modelData, root.lightSurface) }
                     }
 
                     ActionRow {
                       id: workerActions
+                      lightSurface: root.lightSurface
                       anchors.right: parent.right
                       anchors.verticalCenter: parent.verticalCenter
                       requests: Actions.workerActions(wRow.modelData)
@@ -369,7 +378,7 @@ Item {
           width: parent.width
           text: "Environment"
           showDot: true
-          dotColor: Theme.levelColor(root.summary.level)
+          dotColor: Theme.levelColor(root.summary.level, root.lightSurface)
           foreground: root.foreground
           fontFamily: root.fontFamily
         }
@@ -377,9 +386,9 @@ Item {
         Column {
           width: parent.width
           spacing: Style.space(2)
-          StatRow { width: parent.width; label: "nginx"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.nginx) } }
-          StatRow { width: parent.width; label: "." + root.summary.tld + " resolution"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.dns) } }
-          StatRow { width: parent.width; label: "watcher"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.watcher) } }
+          StatRow { width: parent.width; label: "nginx"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.nginx, root.lightSurface) } }
+          StatRow { width: parent.width; label: "." + root.summary.tld + " resolution"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.dns, root.lightSurface) } }
+          StatRow { width: parent.width; label: "watcher"; foreground: root.foreground; fontFamily: root.fontFamily; StatusDot { color: Theme.flagColor(root.summary.watcher, root.lightSurface) } }
           StatRow {
             width: parent.width
             label: "PHP"
@@ -391,7 +400,7 @@ Item {
                 id: phpItem
                 required property var modelData
                 spacing: Style.space(3)
-                StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.flagColor(phpItem.modelData.running) }
+                StatusDot { anchors.verticalCenter: parent.verticalCenter; color: Theme.flagColor(phpItem.modelData.running, root.lightSurface) }
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: phpItem.modelData.version
@@ -426,6 +435,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
               WorkerGlyph {
+                lightSurface: root.lightSurface
                 anchors.verticalCenter: parent.verticalCenter
                 kind: kindRow.modelData.kind
                 running: kindRow.modelData.running > 0
@@ -444,7 +454,7 @@ Item {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: kindRow.modelData.running + "/" + kindRow.modelData.total
-              color: kindRow.down > 0 ? Theme.warn : root.foreground
+              color: kindRow.down > 0 ? root.stateColors.warn : root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
               font.bold: true
@@ -469,6 +479,7 @@ Item {
             font.pixelSize: Style.font.bodySmall
           }
           ActionRow {
+            lightSurface: root.lightSurface
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             requests: [Actions.heal()]
@@ -497,7 +508,7 @@ Item {
         text: "Needs attention"
         count: String(root.issues.length)
         showDot: true
-        dotColor: Theme.levelColor(root.summary.level)
+        dotColor: Theme.levelColor(root.summary.level, root.lightSurface)
         foreground: root.foreground
         fontFamily: root.fontFamily
       }
@@ -514,7 +525,7 @@ Item {
             required property var modelData
             width: (parent.width - root.colGap) / 2
             spacing: Style.space(6)
-            StatusDot { anchors.verticalCenter: parent.verticalCenter; color: /failed|down|not running/.test(issueRow.modelData) ? Theme.bad : Theme.warn }
+            StatusDot { anchors.verticalCenter: parent.verticalCenter; color: /failed|down|not running/.test(issueRow.modelData) ? root.stateColors.bad : root.stateColors.warn }
             Text {
               anchors.verticalCenter: parent.verticalCenter
               width: parent.width - Style.space(12)

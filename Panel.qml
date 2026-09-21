@@ -28,6 +28,9 @@ Panel {
   // light wallpaper left the panel with near-black text on a dark card.
   readonly property color foreground: Color.popups.text
   readonly property color background: Color.popups.background
+  // The theme decides whether the card is dark or light; the state colours
+  // have a set for each.
+  readonly property bool lightSurface: root.background.hslLightness > 0.5
 
   // The views call run() on a request Actions.js built for one of their rows;
   // actionState is what the icons bind to. Both live on the widget, which
@@ -196,7 +199,7 @@ Panel {
 
               StatusDot {
                 anchors.verticalCenter: parent.verticalCenter
-                color: Theme.warn
+                color: Theme.palette(root.lightSurface).warn
               }
               Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -243,6 +246,7 @@ Panel {
           onLoaded: {
             item.summary = Qt.binding(function() { return root.summary })
             item.foreground = Qt.binding(function() { return root.foreground })
+            item.lightSurface = Qt.binding(function() { return root.lightSurface })
             item.fontFamily = Qt.binding(function() { return root.fontFamily })
             item.panel = root
             item.width = Qt.binding(function() { return viewLoader.width })

@@ -109,7 +109,9 @@ which draws the header and the two buttons and loads one of the views:
 it reports back. `Meter.qml`, `StatRow.qml`, `StatusDot.qml`,
 `SectionTitle.qml`, `WorkerGlyph.qml`, `Flag.qml`, `ActionIcon.qml`,
 `ActionRow.qml` and `Mark.qml` are the pieces they are drawn from, and `Theme.js` holds the state palette, which follows the lerd
-dashboard's own colours, plus the few glyphs the chrome needs.
+dashboard's own colours, plus the few glyphs the chrome needs. That palette
+comes in two sets of the same hues, one for a dark popup surface and one for a
+light one, because the bright set falls to 1.5:1 on a light card.
 
 Validate a change the way the shell does before opening a pull request:
 

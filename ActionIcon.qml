@@ -14,6 +14,9 @@ PanelActionButton {
   property var request: null
   // The row's own foreground; the icon only leaves it to say it failed.
   property color baseColor: "white"
+  // Which set of state colours the surface under this icon wants.
+  property bool lightSurface: false
+  readonly property color failColor: Theme.palette(lightSurface).bad
   // Anything with run(request) and actionState — the panel, which forwards
   // to the widget that owns the polling.
   property var panel: null
@@ -26,8 +29,8 @@ PanelActionButton {
   enabled: !!request && !busy
   iconText: busy ? Theme.icon("spinner") : (request ? Theme.icon(request.icon) : "")
   tooltipText: failed ? phase : (request ? request.label : "")
-  foreground: failed ? Theme.bad : baseColor
-  hoverColor: failed ? Theme.bad : baseColor
+  foreground: failed ? failColor : baseColor
+  hoverColor: failed ? failColor : baseColor
   size: Style.space(20)
   fontSize: Style.font.bodySmall
   focusable: true
@@ -41,7 +44,7 @@ PanelActionButton {
     z: -1
     radius: Style.space(4)
     visible: root.failed
-    color: Theme.bad
+    color: root.failColor
     opacity: 0.16
   }
 

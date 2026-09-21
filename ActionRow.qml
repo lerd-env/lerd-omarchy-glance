@@ -18,6 +18,7 @@ Row {
   property var panel: null
   property bool revealed: false
   property color foreground: "white"
+  property bool lightSurface: false
   readonly property bool hovered: rowHover.hovered
 
   readonly property bool sticky: {
@@ -44,6 +45,7 @@ Row {
       request: modelData
       panel: root.panel
       baseColor: root.foreground
+      lightSurface: root.lightSurface
     }
   }
 }
